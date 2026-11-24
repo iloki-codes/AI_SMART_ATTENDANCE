@@ -189,10 +189,10 @@ def mark_attendance(student_id, student_name):
     if file_exists:
         with open(CSV_FILE, "r", newline="", encoding="utf-8") as file:
             reader = csv.DictReader(file)
-        for row in csv.reader:
-            if row.get("Student ID") == student_id and row.get("Date") == today:
-                already_marked = True
-                break
+            for row in reader:
+                if row.get("Student ID") == student_id and row.get("Date") == today:
+                    already_marked = True
+                    break
     if already_marked:
         return "Already marked"
 
@@ -234,7 +234,10 @@ def start_attendance():
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = face_detector.detectMultiScale(
-            gray, scaleFactor=1.2, minNeighbors=5, minSize=(80, 80)
+            gray,
+            scaleFactor=1.2,
+            minNeighbors=5,
+            minSize=(80, 80)
         )
 
         if len(faces) == 0:
@@ -243,49 +246,112 @@ def start_attendance():
             confirmed_label = None
 
         for (x, y, w, h) in faces:
+
             face = gray[y:y+h, x:x+w]
             face = cv2.resize(face, (200, 200))
 
             label, distance = recognizer.predict(face)
 
             if str(label) in label_to_student and distance < RECOGNITION_THRESHOLD:
+
                 student = label_to_student[str(label)]
                 display_name = student["name"]
                 display_text = f"{display_name} - checking"
 
-            if label == last_label:
-                stable_count += 1
+                if label == last_label:
+                    stable_count += 1
+                else:
+                    last_label = label
+                    stable_count = 1
+
+                if stable_count >= 5 and confirmed_label != label:
+                    result = mark_attendance(
+                        student["student_id"],
+                        student["name"]
+                    )
+                    confirmed_label = label
+                    display_text = f"{display_name}: {result}"
+
+                elif confirmed_label == label:
+                    display_text = f"{display_name}: attendance checked"
+
+                box_color = (0, 200, 0)
+
             else:
-                last_label = label
-                stable_count = 1
+                display_text = "Unknown face"
+                box_color = (0, 0, 255)
+                last_label = None
+                stable_count = 0
+                confirmed_label = None
 
-            if stable_count >= 5 and confirmed_label != label:
-                result = mark_attendance(
-                    student["student_id"], student["name"]
-                )
+            # These two instructions MUST stay inside the for loop
+            cv2.rectangle(
+                frame, (x, y), (x+w, y+h), box_color, 2
+            )
 
-                confirmed_label = label
-                display_text = f"{display_name}: {result}"
-            elif confirmed_label == label:
-                display_text = f"{display_name}: attendance checked"
+            cv2.putText(
+                frame, display_text, (x, y-10),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.65, box_color, 2
+            )
 
-            box_color = (0, 200, 0)
-        else:
-            display_text = "Unknown face"
-            box_color = (0, 0, 255)
-            last_label = None
-            stable_count = 0
-            confirmed_label = None
-
-        cv2.rectangle(frame, (x, y), (x+w, y+h), box_color, 2)
-        cv2.putText(
-            frame, display_text, (x, y-10),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.65, box_color, 2
-        )
-
+        # These instructions stay outside the for loop
         cv2.imshow("AI Smart Attendance - Press Q to quit", frame)
+
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
+        # faces = face_detector.detectMultiScale(
+        #     gray, scaleFactor=1.2, minNeighbors=5, minSize=(80, 80)
+        # )
+
+        # if len(faces) == 0:
+        #     last_label = None
+        #     stable_count = 0
+        #     confirmed_label = None
+
+        # for (x, y, w, h) in faces:
+        #     face = gray[y:y+h, x:x+w]
+        #     face = cv2.resize(face, (200, 200))
+
+        #     label, distance = recognizer.predict(face)
+
+        #     if str(label) in label_to_student and distance < RECOGNITION_THRESHOLD:
+        #         student = label_to_student[str(label)]
+        #         display_name = student["name"]
+        #         display_text = f"{display_name} - checking"
+
+        #     if label == last_label:
+        #         stable_count += 1
+        #     else:
+        #         last_label = label
+        #         stable_count = 1
+
+        #     if stable_count >= 5 and confirmed_label != label:
+        #         result = mark_attendance(
+        #             student["student_id"], student["name"]
+        #         )
+
+        #         confirmed_label = label
+        #         display_text = f"{display_name}: {result}"
+        #     elif confirmed_label == label:
+        #         display_text = f"{display_name}: attendance checked"
+
+        #     box_color = (0, 200, 0)
+        # else:
+        #     display_text = "Unknown face"
+        #     box_color = (0, 0, 255)
+        #     last_label = None
+        #     stable_count = 0
+        #     confirmed_label = None
+
+        # cv2.rectangle(frame, (x, y), (x+w, y+h), box_color, 2)
+        # cv2.putText(
+        #     frame, display_text, (x, y-10),
+        #     cv2.FONT_HERSHEY_SIMPLEX, 0.65, box_color, 2
+        # )
+
+        # cv2.imshow("AI Smart Attendance - Press Q to quit", frame)
+        # if cv2.waitKey(1) & 0xFF == ord("q"):
+        #     break
 
     camera.release()
     cv2.destroyAllWindows()
